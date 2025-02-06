@@ -1,67 +1,107 @@
 const { plainTohash, hashToplain } = require('../utils/password')
 const Admin = require('../model/adminModel')
 
-exports.register = async(req,res)=>{
-try {
+exports.register = async (req, res) => {
+    try {
         console.log(req.body)
-        const {username,email,password,confirm_password} = req.body
-        const existEmail = await Admin.findOne({email}).countDocuments().exec()
-        console.log(existEmail)
-        if(existEmail>0){
+        const { username, email, password, confirm_password } = req.body
+        console.log(req.body)
+        const existEmail = await Admin.findOne({ email }).countDocuments().exec()
+        console.log('existEmail:',existEmail)
+        if (existEmail > 0) {
             res.json("email already exist")
-        }else{
+        } else {
             const hashpass = await plainTohash(password)
-            await Admin.create({username,email,password:hashpass})
+            await Admin.create({ username, email, password: hashpass })
             res.redirect('/login')
         }
-} catch (error) {
-    res.json(error)
-}
+    } catch (error) {
+        res.json(error)
+    }
 }
 
-exports.login = async(req,res)=>{
-   try {
-     console.log(req.body)
-     const {email,password} = req.body
-     const existEmail = await Admin.findOne({email}).countDocuments().exec()
-     if(existEmail>0){
-         const admin = await Admin.findOne({email})
-         console.log(admin)
-             const match_pass = await hashToplain(password, admin.password)
-             if(match_pass){
+exports.login = async (req, res) => {
+    try {
+        console.log(req.body)
+        const { email, password } = req.body
+        const existEmail = await Admin.findOne({ email }).countDocuments().exec()
+        if (existEmail > 0) {
+            const admin = await Admin.findOne({ email })
+            console.log(admin)
+            const match_pass = await hashToplain(password, admin.password)
+            if (match_pass) {
                 const payload = {
-                    username:admin.username,
-                    email:admin.email
+                    username: admin.username,
+                    email: admin.email
                 }
-                res.cookie('admin',payload,{httpOnly:true})
-                 res.redirect('/')
-             }else{
-                 res.json("your password is not match")
-             }
-     }else{
-         res.json("email is not exist")
-     }
-   } catch (error) {
-    res.json(error)
-   }
+                res.cookie('admin', payload, { httpOnly: true })
+                res.redirect('/')
+            } else {
+                res.json("your password is not match")
+            }
+        } else {
+            res.json("email is not exist")
+        }
+    } catch (error) {
+        res.json(error)
+    }
 }
 
-exports.updateProfile = async (req,res)=>{
+exports.updateProfile = async (req, res) => {
     console.log(req.body)
     console.log(req.file)
-    const {username,email } = req.body
-    const existEmail = await Admin.findOne({email}).countDocuments().exec()
+    try {
+        const { username, email } = req.body
+        const existEmail = await Admin.findOne({ email }).countDocuments().exec()
 
-    if(existEmail>0){
-        await Admin.updateOne(
-            {email:email},
-            {
-                username,
-                admin_profile: req?.file?.filename
+        if (existEmail > 0) {
+            await Admin.updateOne(
+                { email: email },
+                {
+                    username,
+                    admin_profile: req?.file?.filename
+                }
+            )
+            res.redirect('/myProfile')
+        } else {
+            res.json("your email is not exist")
+        }
+    } catch (error) {
+        res.json(error)
+    }
+}
+
+exports.changePassword = async (req, res) => {
+    const { email, password, new_password, confirm_password } = req.body;
+    try {
+
+        const existEmail = await Admin.findOne({ email }).countDocuments().exec()
+        if (existEmail > 0) {
+            const admin = await Admin.findOne({ email });
+            const match = await hashToplain(password, admin.password)
+
+            if (match) {
+                if (new_password === confirm_password) {
+                    const hash_pass = await plainTohash(new_password)
+
+                    await Admin.updateOne(
+                        { email: email },
+                        {
+                            password: hash_pass
+                        }
+                    )
+                    res.redirect('/')
+                } else {
+                    res.json("Confirm password does not match")
+                }
+            } else {
+                res.json("Password not match")
             }
-        )
-        res.redirect('/myProfile')
-    }else{
-        res.json("your email is not exist")
+        } else {
+            res.json("email id not exist")
+        }
+    }
+    catch (error) {
+        res.json(error)
     }
 }
